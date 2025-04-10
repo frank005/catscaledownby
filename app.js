@@ -1232,7 +1232,7 @@ function startStatsMonitoring() {
             const clientStats = await client.getRTCStats();
             const clientStats2 = await client2.getRTCStats();
             const localVideoStats = await client.getLocalVideoStats();
-
+            const localAudioStats = await client.getLocalAudioStats();
             // Update connection states
             peerConnectionState = client._peerConnectionState;
             connectionState = client.connectionState;
@@ -1241,12 +1241,14 @@ function startStatsMonitoring() {
             
             // Get remote stats for the specific user
             let remoteVideoStats = {};
+            let remoteAudioStats = {};
             const remoteUser = client2.remoteUsers.find(user => user.uid === client.uid);
             if (remoteUser) {
                 remoteVideoStats = await client2.getRemoteVideoStats()[remoteUser.uid];
+                remoteAudioStats = await client2.getRemoteAudioStats()[remoteUser.uid];
             }
             
-            updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStats);
+            updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStats, localAudioStats, remoteAudioStats);
         } catch (error) {
             console.error("Error getting stats:", error);
         }
@@ -1262,7 +1264,7 @@ function stopStatsMonitoring() {
 }
 
 // Update stats display
-function updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStats) {
+function updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStats, localAudioStats, remoteAudioStats) {
     const duration = Math.floor((Date.now() - startTime) / 1000);
     
     // Helper function to get colored status text
@@ -1327,6 +1329,8 @@ function updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStat
 
     // Update local video stats
     document.getElementById('localVideoStats').innerHTML = [
+        `<span style="color: #2196F3;">Video Stats</span>`,
+        `Codec: ${localVideoStats.codecType}`,
         `Capture FPS: ${localVideoStats.captureFrameRate}`,
         `Send FPS: ${localVideoStats.sendFrameRate}`,
         `Video encode delay: ${Number(localVideoStats.encodeDelay).toFixed(2)}ms`,
@@ -1335,23 +1339,38 @@ function updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStat
         `Send Jitter: ${Number(localVideoStats.sendJitterMs).toFixed(2)}ms`,
         `Send RTT: ${Number(localVideoStats.sendRttMs).toFixed(2)}ms`,
         `Packet Loss: ${Number(localVideoStats.currentPacketLossRate).toFixed(3)}%`,
-        `Network Quality: ${clientNetQuality.uplink}`
+        `Network Quality: ${clientNetQuality.uplink}`,
+        `<span style="color: #2196F3;">Audio Stats</span>`,
+        `Codec: ${localAudioStats.codecType}`,
+        `Send Level: ${localAudioStats.sendVolumeLevel}`,
+        `Audio Send Bitrate: ${(Number(localAudioStats.sendBitrate) * 0.000001).toFixed(4)} Mbps`,
+        `Audio Send Jitter: ${Number(localAudioStats.sendJitterMs).toFixed(2)}ms`,
+        `Audio Send RTT: ${Number(localAudioStats.sendRttMs).toFixed(2)}ms`,
+        `Audio Packet Loss: ${Number(localAudioStats.currentPacketLossRate).toFixed(3)}%`
     ].join('<br>');
 
     if (remoteVideoStats) {
         document.getElementById('remoteVideoStats').innerHTML = [
+            `<span style="color: #2196F3;">Video Stats</span>`,
+            `Codec: ${remoteVideoStats.codecType}`,
             `Receive FPS: ${remoteVideoStats.receiveFrameRate}`,
             `Decode FPS: ${remoteVideoStats.decodeFrameRate}`,
             `Render FPS: ${remoteVideoStats.renderFrameRate}`,
             `Resolution: ${remoteVideoStats.receiveResolutionWidth}x${remoteVideoStats.receiveResolutionHeight}`,
             `Receive bitrate: ${(Number(remoteVideoStats.receiveBitrate) * 0.000001).toFixed(4)} Mbps`,
-            `Video receive delay: ${Number(remoteVideoStats.receiveDelay).toFixed(0)}ms`,
+            `receive delay: ${Number(remoteVideoStats.receiveDelay).toFixed(0)}ms`,
             `Packets lost: ${remoteVideoStats.receivePacketsLost}`,
             `E2E Delay: ${remoteVideoStats.end2EndDelay}ms`,
             `Transport Delay: ${remoteVideoStats.transportDelay}ms`,
             `Freeze Rate: ${Number(remoteVideoStats.freezeRate).toFixed(3)}%`,
             `Total freeze time: ${remoteVideoStats.totalFreezeTime}s`,
-            `Network Quality: ${clientNetQuality2.downlink}`
+            `Network Quality: ${clientNetQuality2.downlink}`,
+            `<span style="color: #2196F3;">Audio Stats</span>`,
+            `Codec: ${remoteAudioStats.codecType}`,
+            `Receive Level: ${remoteAudioStats.receiveLevel}`,
+            `Receive Bitrate: ${(Number(remoteAudioStats.receiveBitrate) * 0.000001).toFixed(4)} Mbps`,
+            `receive delay: ${Number(remoteAudioStats.receiveDelay).toFixed(0)}ms`,
+            `Transport Delay: ${remoteAudioStats.transportDelay}ms`,
         ].join('<br>');
     }
 
