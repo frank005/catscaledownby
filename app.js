@@ -11,6 +11,12 @@ let isAinsEnabled = false;
 let startTime;
 let statsInterval;
 let joined = false;
+let peerConnectionState = "disconnected";
+let connectionState = "disconnected";
+let peerConnectionState2 = "disconnected";
+let connectionState2 = "disconnected";
+let relayState = "false";
+let relayState2 = "false";
 
 //Agora net-quality stats
 var clientNetQuality = {uplink: 0, downlink: 0};
@@ -317,26 +323,103 @@ function setupEventHandlers() {
         clientNetQuality2.downlink = stats.downlinkNetworkQuality;
     });
 
-    // Connection state handlers
-    client.on("connection-state-change", (state, reason) => {
-        console.log("Connection state changed:", state, reason);
-        showPopup(`Connection state changed to: ${state}`);
+    // Regular connection state handler (without scale reset)
+    client.on("connection-state-change", (cur, prev, reason) => {
+        connectionState = cur;
+        
+        if (cur === "DISCONNECTED") {
+            console.log(`Sender: connection-state-changed: Current: ${cur}, Previous: ${prev}, Reason: ${reason}`);
+            showPopup(`Sender: Connection State: ${cur}, Reason: ${reason}`);
+            if (reason === "FALLBACK") {
+                console.log(`Sender: Autofallback TCP Proxy being attempted.`);
+                showPopup(`Sender: Autofallback TCP Proxy Attempted`);
+            }
+        } else if (cur === "CONNECTED") {
+            console.log(`Sender: connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Sender: Connection State: ${cur}`);
+            joined = true;
+        } else {
+            console.log(`Sender: connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Sender: Connection State: ${cur}`);
+            joined = false;
+        }
     });
 
-    client2.on("connection-state-change", (state, reason) => {
-        console.log("Client2 connection state changed:", state, reason);
-        showPopup(`Client2 connection state changed to: ${state}`);
+    // Connection state handlers for client2
+    client2.on("connection-state-change", (cur, prev, reason) => {
+        connectionState2 = cur;
+        
+        if (cur === "DISCONNECTED") {
+            console.log(`Receiver: connection-state-changed: Current: ${cur}, Previous: ${prev}, Reason: ${reason}`);
+            showPopup(`Receiver: Connection State: ${cur}, Reason: ${reason}`);
+            if (reason === "FALLBACK") {
+                console.log(`Receiver: Autofallback TCP Proxy being attempted.`);
+                showPopup(`Receiver: Autofallback TCP Proxy Attempted`);
+            }
+        } else if (cur === "CONNECTED") {
+            console.log(`Receiver: connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Receiver: Connection State: ${cur}`);
+            joined = true;
+        } else {
+            console.log(`Receiver: connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Receiver: Connection State: ${cur}`);
+            joined = false;
+        }
+    });
+
+    // Peer connection state handler with scale reset
+    client.on("peerconnection-state-change", (cur, prev) => {
+        peerConnectionState = cur;
+        const scaleValue = document.getElementById("scale-list").value;
+
+        if (cur === "connected" && prev === "connecting") {
+            console.log(`Sender: peer-connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Sender: Peer Connection State: ${cur}`);
+            if (scaleValue != 1) {
+                console.log("Restoring scale settings after peer connection established");
+                setScale();
+            }
+        } else {
+            console.log(`Sender: peer-connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Sender: Peer Connection State: ${cur}`);
+        }
+    });
+
+    // Peer connection state handlers for client2
+    client2.on("peerconnection-state-change", (cur, prev) => {
+        peerConnectionState2 = cur;
+        
+        if (cur === "disconnected") {
+            console.log(`Receiver: peer-connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Receiver: Peer Connection State: ${cur}`);
+        } else if (cur === "connected") {
+            console.log(`Receiver: peer-connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Receiver: Peer Connection State: ${cur}`);
+        } else {
+            console.log(`Receiver: peer-connection-state-changed: Current: ${cur}, Previous: ${prev}`);
+            showPopup(`Receiver: Peer Connection State: ${cur}`);
+        }
     });
 
     // Cloud proxy handlers
     client.on("is-using-cloud-proxy", (isUsing) => {
         console.log("Using cloud proxy:", isUsing);
         showPopup(`Cloud proxy ${isUsing ? "enabled" : "disabled"}`);
+        if (isUsing) {
+            relayState = "true";
+        } else {
+            relayState = "false";
+        }
     });
 
     client.on("join-fallback-to-proxy", () => {
         console.log("Falling back to proxy");
         showPopup("Falling back to proxy");
+        if (isUsing) {
+            relayState = "true";
+        } else {
+            relayState = "false";
+        }
     });
 
     // Stream type change handler
@@ -554,7 +637,6 @@ async function joinChannel() {
         showPopup(`Joining channel ${channelName} as host...`);
         await client.join(appId, channelName, token, uid);
         await client.publish([localAudioTrack, localVideoTrack]);
-        joined = true;
         // Join channel as audience
         showPopup("Joining channel as audience...");
         await client2.join(appId, channelName, token, null);
@@ -1147,6 +1229,12 @@ function startStatsMonitoring() {
             const clientStats = await client.getRTCStats();
             const clientStats2 = await client2.getRTCStats();
             const localVideoStats = await client.getLocalVideoStats();
+
+            // Update connection states
+            peerConnectionState = client._peerConnectionState;
+            connectionState = client.connectionState;
+            peerConnectionState2 = client2._peerConnectionState;
+            connectionState2 = client2.connectionState;
             
             // Get remote stats for the specific user
             let remoteVideoStats = {};
@@ -1181,7 +1269,10 @@ function updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStat
         `Duration: ${duration}s`,
         `RTT: ${clientStats.RTT}ms`,
         `Outgoing B/W: ${(Number(clientStats.OutgoingAvailableBandwidth) * 0.001).toFixed(4)} Mbps`,
-        `Link Status: ${navigator.onLine ? "Online" : "Offline"}`
+        `Link Status: ${navigator.onLine ? "Online" : "Offline"}`,
+        `Connection State: ${connectionState}`,
+        `Peer Connection State: ${peerConnectionState}`,
+        `Relay State: ${relayState}`
     ].map(stat => `<div class="stat-item">${stat}</div>`).join('');
 
     // Update local video stats
@@ -1603,15 +1694,17 @@ function toggleSVCControls() {
 
 // Add function to set scale
 document.getElementById("scale-list").addEventListener("change", setScale);
+document.getElementById("touchBitrate").addEventListener("change", setScale);
 
 async function setScale() {
   if (joined) {
-    const scaleValue = parseFloat(document.getElementById("scale-list").value);
+    scaleValue = parseFloat(document.getElementById("scale-list").value);
     const rtpconnections = client._p2pChannel.connection.peerConnection.getSenders();
     const videosender = rtpconnections.find((val) => val?.track?.kind === 'video');
 
     if (!videosender) {
       console.warn("No video sender found.");
+      showPopup("No video sender found");
       return;
     }
 
@@ -1625,6 +1718,9 @@ async function setScale() {
     if (document.getElementById("touchBitrate").checked) {
       const bitrate = Math.floor(580000 / scaleValue);
       params.encodings[0].maxBitrate = bitrate;
+      showPopup(`Scale set to ${scaleValue}x with bitrate adjusted to ${bitrate} bps`);
+    } else {
+      showPopup(`Scale set to ${scaleValue}x (bitrate unchanged)`);
     }
 
     await videosender.setParameters(params);
