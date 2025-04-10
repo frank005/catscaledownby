@@ -625,6 +625,19 @@ body::before {
     font-weight: bold;
 }
 
+.horizontal-group .horizontal-inputs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.touch-bitrate-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
 /* Add a fun animation for the SVC controls appearance */
 .input-group[style*="display: block"] {
     animation: popIn 0.3s ease-out;
