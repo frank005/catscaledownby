@@ -372,11 +372,12 @@ function setupEventHandlers() {
         peerConnectionState = cur;
         const scaleValue = document.getElementById("scale-list").value;
 
-        if (cur === "connected" && prev === "connecting") {
+        if (prev === "disconnected") {
             console.log(`Sender: peer-connection-state-changed: Current: ${cur}, Previous: ${prev}`);
             showPopup(`Sender: Peer Connection State: ${cur}`);
             if (scaleValue != 1) {
                 console.log("Restoring scale settings after peer connection established");
+                showPopup("Restoring scale settings after peer connection established");
                 setScale();
             }
         } else {
@@ -406,8 +407,10 @@ function setupEventHandlers() {
         console.log("Using cloud proxy:", isUsing);
         showPopup(`Cloud proxy ${isUsing ? "enabled" : "disabled"}`);
         if (isUsing) {
+            console.log("client isUsing", isUsing);
             relayState = "true";
         } else {
+            console.log("client isUsing", isUsing);
             relayState = "false";
         }
     });
@@ -1262,6 +1265,53 @@ function stopStatsMonitoring() {
 function updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStats) {
     const duration = Math.floor((Date.now() - startTime) / 1000);
     
+    // Helper function to get colored status text
+    const getColoredStatus = (status, type) => {
+        let color;
+        switch (type) {
+            case 'link':
+                color = status ? '#4CAF50' : '#F44336'; // Green for online, Red for offline
+                return `<span style="color: ${color}; font-weight: bold;">${status ? 'Online' : 'Offline'}</span>`;
+            case 'connection':
+                switch (status) {
+                    case 'CONNECTED':
+                        color = '#4CAF50'; // Green
+                        break;
+                    case 'CONNECTING':
+                        color = '#FFA500'; // Orange
+                        break;
+                    case 'DISCONNECTED':
+                        color = '#F44336'; // Red
+                        break;
+                    default:
+                        color = '#757575'; // Grey for other states
+                }
+                return `<span style="color: ${color}; font-weight: bold;">${status}</span>`;
+            case 'peer':
+                switch (status) {
+                    case 'connected':
+                        color = '#4CAF50'; // Green
+                        break;
+                    case 'connecting':
+                        color = '#FFA500'; // Orange
+                        break;
+                    case 'disconnected':
+                    case 'failed':
+                        color = '#F44336'; // Red
+                        break;
+                    case 'closed':
+                        color = '#757575'; // Grey
+                        break;
+                    default:
+                        color = '#757575'; // Grey for other states
+                }
+                return `<span style="color: ${color}; font-weight: bold;">${status}</span>`;
+            case 'relay':
+                color = status == "true"?  '#FFA500' : '#4CAF50'; // Orange for relay, Green for direct
+                return `<span style="color: ${color}; font-weight: bold;">${status == "true" ? 'Yes' : 'No'}</span>`;
+        }
+    };
+    
     // Update overall stats
     document.getElementById('overallStats').innerHTML = [
         `Local UID: ${client.uid}`,
@@ -1269,10 +1319,10 @@ function updateStats(clientStats, clientStats2, localVideoStats, remoteVideoStat
         `Duration: ${duration}s`,
         `RTT: ${clientStats.RTT}ms`,
         `Outgoing B/W: ${(Number(clientStats.OutgoingAvailableBandwidth) * 0.001).toFixed(4)} Mbps`,
-        `Link Status: ${navigator.onLine ? "Online" : "Offline"}`,
-        `Connection State: ${connectionState}`,
-        `Peer Connection State: ${peerConnectionState}`,
-        `Relay State: ${relayState}`
+        `Link Status: ${getColoredStatus(navigator.onLine, 'link')}`,
+        `Connection State: ${getColoredStatus(connectionState, 'connection')}`,
+        `Peer Connection State: ${getColoredStatus(peerConnectionState, 'peer')}`,
+        `Relay: ${getColoredStatus(relayState, 'relay')}`
     ].map(stat => `<div class="stat-item">${stat}</div>`).join('');
 
     // Update local video stats
